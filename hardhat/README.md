@@ -1,57 +1,199 @@
-# Sample Hardhat 3 Project (`node:test` and `viem`)
+# Privacy-Preserving AI Bounty Judge
 
-This project showcases a Hardhat 3 project using the native Node.js test runner (`node:test`) and the `viem` library for Ethereum interactions.
+This Hardhat package contains the updated `AIJudge` contract for the Ritual Academy assignment.
 
-To learn more about Hardhat 3, please visit the [Getting Started guide](https://hardhat.org/docs/getting-started#getting-started-with-hardhat-3). To share your feedback, join our [Hardhat 3](https://hardhat.org/hardhat3-telegram-group) Telegram group or [open an issue](https://github.com/NomicFoundation/hardhat/issues/new) in our GitHub issue tracker.
+The original workshop contract stored answers directly on-chain during the submission period. That made every answer public immediately, so later participants could copy existing answers and improve them. This version fixes that required-track flaw with a standard EVM-compatible **commit-reveal** flow.
 
-## Project Overview
+## Lifecycle
 
-This example project includes:
+### 1. Create bounty
 
-- A simple Hardhat configuration file.
-- Foundry-compatible Solidity unit tests.
-- TypeScript integration tests using [`node:test`](nodejs.org/api/test.html), the new Node.js native test runner, and [`viem`](https://viem.sh/).
-- Examples demonstrating how to connect to different types of networks, including locally simulating OP mainnet.
+The bounty owner creates a bounty with a title, rubric, deadline, and reward:
 
-## Usage
-
-### Running Tests
-
-To run all the tests in the project, execute the following command:
-
-```shell
-npx hardhat test
+```solidity
+createBounty(string title, string rubric, uint256 deadline) payable
 ```
 
-You can also selectively run the Solidity or `node:test` tests:
+The reward is held by the `AIJudge` contract until the owner finalizes a winner.
+
+### 2. Commit phase — hidden answers
+
+Before the deadline, each participant computes a commitment off-chain:
+
+```solidity
+keccak256(abi.encodePacked(answer, salt, msg.sender, bountyId))
+```
+
+Then they submit only the hash:
+
+```solidity
+submitCommitment(uint256 bountyId, bytes32 commitment)
+```
+
+During this phase, the contract stores only:
+
+- submitter address
+- commitment hash
+- empty answer string
+- `revealed = false`
+
+The plaintext answer and salt stay with the participant.
+
+### 3. Reveal phase — prove the hidden answer
+
+After the deadline, participants reveal their answer and salt:
+
+```solidity
+revealAnswer(uint256 bountyId, string calldata answer, bytes32 salt)
+```
+
+The contract recomputes:
+
+```solidity
+keccak256(abi.encodePacked(answer, salt, msg.sender, bountyId))
+```
+
+If the recomputed hash matches the stored commitment, the answer is marked as revealed and becomes eligible for judging. Wrong salt, wrong answer, or a different wallet cannot reveal the commitment.
+
+### 4. AI judging — batch judging only
+
+The bounty owner calls:
+
+```solidity
+judgeAll(uint256 bountyId, bytes calldata llmInput)
+```
+
+Only revealed answers should be included in the `llmInput` prompt. The contract calls Ritual's LLM precompile at:
+
+```txt
+0x0000000000000000000000000000000000000802
+```
+
+This should be one batch LLM request containing the bounty rubric and all valid revealed answers, not one LLM call per answer.
+
+### 5. Human finalization
+
+The owner finalizes the winner:
+
+```solidity
+finalizeWinner(uint256 bountyId, uint256 winnerIndex)
+```
+
+The AI review helps the owner evaluate submissions, but the contract keeps the final reward decision human-controlled. The winner index must point to a revealed submission.
+
+## Required functions implemented
+
+- `submitCommitment(uint256 bountyId, bytes32 commitment)`
+- `revealAnswer(uint256 bountyId, string calldata answer, bytes32 salt)`
+- `judgeAll(uint256 bountyId, bytes calldata llmInput)`
+- `finalizeWinner(uint256 bountyId, uint256 winnerIndex)`
+
+Additional helpers:
+
+- `computeCommitment(string answer, bytes32 salt, address submitter, uint256 bountyId)`
+- `getSubmission(uint256 bountyId, uint256 index)`
+- `getRevealedSubmissionCount(uint256 bountyId)`
+- `getSubmissionIndex(uint256 bountyId, address submitter)`
+
+## Test plan
+
+The Solidity test file is:
+
+```txt
+contracts/AIJudgeCommitReveal.t.sol
+```
+
+Run:
 
 ```shell
 npx hardhat test solidity
-npx hardhat test nodejs
 ```
 
-### Make a deployment to Sepolia
+Test cases cover:
 
-This project includes an example Ignition module to deploy the contract. You can deploy this module to a locally simulated chain or to Sepolia.
+1. A commitment stores only a hash and no public answer.
+2. A correct reveal after the deadline stores the plaintext answer and marks it eligible.
+3. Reveal with the wrong salt reverts.
+4. Reveal from a different wallet reverts.
+5. Commitments after the deadline revert.
+6. Reveals before the deadline revert.
+7. Judging with no revealed answers reverts.
+8. Finalizing before judging reverts.
 
-To run the deployment to a local chain:
+## Architecture note: Required Track
 
-```shell
-npx hardhat ignition deploy ignition/modules/Counter.ts
+### What is public
+
+- bounty title
+- bounty rubric
+- deadline
+- reward amount
+- submitter addresses
+- commitment hashes
+- revealed answers after the deadline
+- AI review result after judging
+- final winner and payment event
+
+### What stays hidden before reveal
+
+- plaintext answer
+- salt
+
+The salt must be random and saved by the participant. If the participant loses the salt, they cannot reveal their answer.
+
+### Why the hash includes `msg.sender` and `bountyId`
+
+The commitment binds the answer to one wallet and one bounty:
+
+```solidity
+keccak256(abi.encodePacked(answer, salt, msg.sender, bountyId))
 ```
 
-To run the deployment to Sepolia, you need an account with funds to send the transaction. The provided Hardhat configuration includes a Configuration Variable called `SEPOLIA_PRIVATE_KEY`, which you can use to set the private key of the account you want to use.
+This prevents someone else from taking a revealed answer/salt pair and reusing it under a different address or bounty.
 
-You can set the `SEPOLIA_PRIVATE_KEY` variable using the `hardhat-keystore` plugin or by setting it as an environment variable.
+## Architecture note: Advanced Ritual-native hidden submissions
 
-To set the `SEPOLIA_PRIVATE_KEY` config variable using `hardhat-keystore`:
+A stronger Ritual-native version could keep submissions encrypted even through judging. In that design:
 
-```shell
-npx hardhat keystore set SEPOLIA_PRIVATE_KEY
+### Stored on-chain
+
+- bounty metadata
+- ciphertext hash or encrypted submission reference
+- submitter address
+- eligibility/commitment metadata
+- final AI review or encrypted AI result
+
+### Stored off-chain
+
+- encrypted full answers, for example in a storage provider such as GCS, HuggingFace, Pinata, IPFS, or a frontend-managed storage service
+
+### Where plaintext exists
+
+Plaintext should exist only in these places:
+
+1. In the participant's browser before encryption.
+2. Inside the Ritual TEE executor during batch judging.
+3. In the final output only if the app intentionally publishes the judging summary or revealed answers.
+
+### How the LLM receives submissions
+
+The frontend or contract would pass encrypted answer references/secrets to a Ritual TEE-backed execution flow. The executor decrypts all valid submissions inside the TEE, builds one batch prompt containing the bounty rubric and all answers, and sends one LLM request for judging. This satisfies the Ritual focus: use encrypted secrets/private inputs and batch judging, not one LLM call per answer.
+
+## Reflection question
+
+**What should be public, what should stay hidden, and what should be decided by AI versus by a human in a bounty system?**
+
+Bounty metadata such as the title, reward, deadline, rules, and final winner should be public so participants can verify that the process is fair. Submissions should stay hidden during the active submission phase because public answers allow copying, plagiarism, and last-minute improvement based on other people’s work. In the commit-reveal version, only the commitment hash is public before the deadline, while the actual answer and salt stay private with the participant until reveal. After the reveal phase, valid answers can become public so the community can audit what was judged. AI should help evaluate submissions against the rubric, summarize strengths and weaknesses, and recommend a winner. However, the final decision and reward transfer should stay under human control because AI can make mistakes, misunderstand context, or be manipulated by prompt wording. Ritual’s TEE-backed execution can improve this further by letting encrypted submissions stay hidden even during judging, with plaintext only appearing inside secure execution. The best design is transparent about rules and outcomes, private during competition, AI-assisted during review, and human-finalized for accountability.
+
+## Ritual deployment notes
+
+Ritual network configuration is already present in `hardhat.config.ts`:
+
+```txt
+RPC: https://rpc.ritualfoundation.org
+Chain ID: 1979
+LLM precompile: 0x0000000000000000000000000000000000000802
+RitualWallet: 0x532F0dF0896F353d8C3DD8cc134e8129DA2a3948
 ```
 
-After setting the variable, you can run the deployment with the Sepolia network:
-
-```shell
-npx hardhat ignition deploy --network sepolia ignition/modules/Counter.ts
-```
+The LLM precompile requires RitualWallet funding for async execution fees. The bounty reward stays in the `AIJudge` contract; LLM execution fees are separate.
