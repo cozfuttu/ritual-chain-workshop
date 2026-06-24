@@ -36,9 +36,10 @@ export function JudgeAll({
   const walletStatus = useRitualWalletStatus(address);
 
   const count = Number(bounty.submissionCount);
+  const revealedCount = Number(bounty.revealedCount);
 
-  // Gate per spec: owner only, has submissions, not yet judged.
-  if (!isOwner || bounty.judged || bounty.finalized || count === 0) {
+  // Gate per spec: owner only, has revealed submissions, not yet judged.
+  if (!isOwner || bounty.judged || bounty.finalized || revealedCount === 0) {
     return null;
   }
 
@@ -47,16 +48,22 @@ export function JudgeAll({
     setGatherError(null);
     setGathering(true);
     try {
-      // 1–2. Load every submission for this bounty.
+      // 1–2. Load every revealed submission for this bounty.
       const submissions: JudgeSubmission[] = [];
       for (let i = 0; i < count; i++) {
-        const [submitter, answer] = await publicClient.readContract({
+        const [submitter, , answer, revealed] = await publicClient.readContract({
           address: contractAddress,
           abi: aiJudgeAbi,
           functionName: "getSubmission",
           args: [bountyId, BigInt(i)],
         });
-        submissions.push({ index: i, submitter, answer });
+        if (revealed) {
+          submissions.push({ index: i, submitter, answer });
+        }
+      }
+
+      if (submissions.length === 0) {
+        throw new Error("No revealed submissions to judge.");
       }
 
       // 3–4. Build the batch judging prompt and encode the Ritual LLM request.
@@ -104,14 +111,14 @@ export function JudgeAll({
         <Button onClick={handleJudge} disabled={busy || !fundingReady} className="w-full">
           {gathering ? (
             <>
-              <Spinner /> Gathering {count} submissions…
+              <Spinner /> Gathering {revealedCount} revealed submissions…
             </>
           ) : tx.isBusy ? (
             "Judging…"
           ) : !fundingReady ? (
             "Fund RitualWallet to judge"
           ) : (
-            `Judge all (${count})`
+            `Judge all revealed (${revealedCount})`
           )}
         </Button>
         {gatherError && <Notice tone="red">{gatherError}</Notice>}

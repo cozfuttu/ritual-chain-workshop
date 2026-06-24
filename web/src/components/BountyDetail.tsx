@@ -47,7 +47,8 @@ export function BountyDetail({
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-2">
           <Stat label="Reward" value={formatReward(bounty.reward)} />
-          <Stat label="Submissions" value={bounty.submissionCount.toString()} />
+          <Stat label="Commitments" value={bounty.submissionCount.toString()} />
+          <Stat label="Revealed" value={bounty.revealedCount.toString()} />
           <Stat
             label="Deadline"
             value={
