@@ -3,10 +3,10 @@
 ## Smart Contract
 - **Network:** Ritual Chain Testnet
 - **Chain ID:** 1979
-- **Contract Address:** `0xb31bc7f5c2e1C11308237EB325248336a9cf4617`
-- **Deployer:** `0x8f8E6a010e8A8eB76be350FDF2bB8A3CEDa42De8`
-- **Tx Hash:** `0xe77927bddd6113dc845993c50d0f199f3d67bf71adafe42993e1a767f2d6f5c6`
-- **Explorer:** https://explorer.ritualfoundation.org/address/0xb31bc7f5c2e1C11308237EB325248336a9cf4617
+- **Contract Address:** `0xe15195d08763076f3FE74884507A559C1b4d23f8`
+- **Deployer:** `0xb31bc7f5c2e1C11308237EB325248336a9cf4617`
+- **Tx Hash:** `0xc464e6bc267a4606cf30527f5bfb386b10590abc03770820db31fa5ed27ab870`
+- **Explorer:** https://explorer.ritualfoundation.org/address/0xe15195d08763076f3FE74884507A559C1b4d23f8
 
 ## Test Results
 - **Total Tests:** 10
