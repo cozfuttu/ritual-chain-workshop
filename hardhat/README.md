@@ -1,57 +1,145 @@
-# Sample Hardhat 3 Project (`node:test` and `viem`)
+# 🔐 Privacy-Preserving AI Bounty Judge
 
-This project showcases a Hardhat 3 project using the native Node.js test runner (`node:test`) and the `viem` library for Ethereum interactions.
+> Ritual Chain Workshop Assignment — Commit-Reveal + AI Judging via Ritual Precompile
 
-To learn more about Hardhat 3, please visit the [Getting Started guide](https://hardhat.org/docs/getting-started#getting-started-with-hardhat-3). To share your feedback, join our [Hardhat 3](https://hardhat.org/hardhat3-telegram-group) Telegram group or [open an issue](https://github.com/NomicFoundation/hardhat/issues/new) in our GitHub issue tracker.
+## 📋 Overview
 
-## Project Overview
+A bounty system where submissions remain **hidden** until judging is complete, preventing participants from copying others' ideas. Uses **commit-reveal** mechanism + **Ritual Chain's LLM precompile (0x0802)** for AI-powered judging.
 
-This example project includes:
+## 🔄 Lifecycle
 
-- A simple Hardhat configuration file.
-- Foundry-compatible Solidity unit tests.
-- TypeScript integration tests using [`node:test`](nodejs.org/api/test.html), the new Node.js native test runner, and [`viem`](https://viem.sh/).
-- Examples demonstrating how to connect to different types of networks, including locally simulating OP mainnet.
-
-## Usage
-
-### Running Tests
-
-To run all the tests in the project, execute the following command:
-
-```shell
-npx hardhat test
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    BOUNTY LIFECYCLE                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. CREATE BOUNTY                                               │
+│     └─ Admin creates bounty with prize pool + deadlines        │
+│                                                                 │
+│  2. SUBMISSION PHASE (Commit)                                   │
+│     └─ Participants submit keccak256(answer, salt, sender, id) │
+│     └─ Answer is HIDDEN — only hash is stored on-chain         │
+│                                                                 │
+│  3. REVEAL PHASE                                                │
+│     └─ Participants reveal answer + salt                        │
+│     └─ Contract verifies hash matches commitment                │
+│     └─ Invalid reveals are rejected                             │
+│                                                                 │
+│  4. AI JUDGING                                                  │
+│     └─ Admin triggers judging via Ritual LLM precompile 0x0802 │
+│     └─ AI scores each revealed answer (0-100)                  │
+│     └─ Scores are stored on-chain                               │
+│                                                                 │
+│  5. FINALIZATION                                                │
+│     └─ Admin finalizes winner (highest score)                   │
+│     └─ Prize pool transferred to winner                         │
+│     └─ Participants ranked by score                             │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-You can also selectively run the Solidity or `node:test` tests:
+## 🛠️ Functions
 
-```shell
-npx hardhat test solidity
-npx hardhat test nodejs
+### Admin Functions
+```solidity
+// Create a new bounty with prize pool
+createBounty(title, description, submissionDeadline, revealDeadline) payable
+
+// Trigger AI judging on all revealed answers
+judgeAll(bountyId, llmInput)
+
+// Finalize winner and distribute prize
+finalizeWinner(bountyId)
 ```
 
-### Make a deployment to Sepolia
+### Participant Functions
+```solidity
+// Submit commitment hash (answer is hidden)
+submitCommitment(bountyId, commitment)
 
-This project includes an example Ignition module to deploy the contract. You can deploy this module to a locally simulated chain or to Sepolia.
-
-To run the deployment to a local chain:
-
-```shell
-npx hardhat ignition deploy ignition/modules/Counter.ts
+// Reveal answer after submission deadline
+revealAnswer(bountyId, answer, salt)
 ```
 
-To run the deployment to Sepolia, you need an account with funds to send the transaction. The provided Hardhat configuration includes a Configuration Variable called `SEPOLIA_PRIVATE_KEY`, which you can use to set the private key of the account you want to use.
-
-You can set the `SEPOLIA_PRIVATE_KEY` variable using the `hardhat-keystore` plugin or by setting it as an environment variable.
-
-To set the `SEPOLIA_PRIVATE_KEY` config variable using `hardhat-keystore`:
-
-```shell
-npx hardhat keystore set SEPOLIA_PRIVATE_KEY
+### View Functions
+```solidity
+getBounty(bountyId)           // Get bounty details
+getSubmission(bountyId, addr) // Get submission status
+getParticipantCount(bountyId) // Get participant count
+verifyCommitment(...)         // Verify a commitment hash
 ```
 
-After setting the variable, you can run the deployment with the Sepolia network:
+## 🔒 Security Features
 
-```shell
-npx hardhat ignition deploy --network sepolia ignition/modules/Counter.ts
+1. **Commit-Reveal** — Answers hidden until reveal phase
+2. **Hash Verification** — `keccak256(answer, salt, sender, bountyId)` must match
+3. **Time-Locked Phases** — Submission → Reveal → Judging → Finalize
+4. **Duplicate Prevention** — One commitment per participant per bounty
+5. **Admin Controls** — Only admin can create bounties and finalize winners
+
+## 🧪 Test Coverage
+
+```bash
+forge test -vv
 ```
+
+| Test | Status |
+|------|--------|
+| Create Bounty | ✅ |
+| Create Bounty (Non-Admin Revert) | ✅ |
+| Submit Commitment | ✅ |
+| Submit Commitment (After Deadline) | ✅ |
+| Submit Commitment (Duplicate) | ✅ |
+| Reveal Answer | ✅ |
+| Reveal Answer (Invalid) | ✅ |
+| Reveal Answer (Before Deadline) | ✅ |
+| Verify Commitment | ✅ |
+| Verify Commitment (Invalid) | ✅ |
+
+## 🚀 Deploy to Ritual Chain
+
+```bash
+# Set private key in .env
+export PRIVATE_KEY=your_private_key
+
+# Deploy
+forge create src/PrivacyBounty.sol:PrivacyBounty \
+  --rpc-url https://rpc.ritualfoundation.org \
+  --private-key $PRIVATE_KEY
+```
+
+## 🔗 Ritual Chain Integration
+
+**LLM Precompile:** `0x0000000000000000000000000000000000000802`
+
+The contract calls Ritual's LLM precompile for AI judging:
+- Encodes prompt with participant answer
+- Calls precompile 0x0802 for inference
+- Parses score from response
+- Fallback: deterministic score if precompile unavailable
+
+## 📁 Project Structure
+
+```
+privacy-bounty-judge/
+├── src/
+│   └── PrivacyBounty.sol    # Main contract
+├── test/
+│   └── PrivacyBounty.t.sol  # Tests
+├── script/
+│   └── Deploy.s.sol         # Deploy script (optional)
+├── foundry.toml             # Foundry config
+└── README.md                # This file
+```
+
+## 📝 Architecture Note
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed architecture documentation.
+
+## 🤔 Reflection
+
+See [REFLECTION.md](./REFLECTION.md) for the reflection question response.
+
+## 📄 License
+
+MIT
