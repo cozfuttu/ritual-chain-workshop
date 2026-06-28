@@ -6,7 +6,8 @@ export type Bounty = {
   title: string;
   rubric: string;
   reward: bigint;
-  deadline: bigint;
+  submitDeadline: bigint;
+  revealDeadline: bigint;
   judged: boolean;
   finalized: boolean;
   submissionCount: bigint;
@@ -22,6 +23,7 @@ export function parseBounty(
     string,
     bigint,
     bigint,
+    bigint,
     boolean,
     boolean,
     bigint,
@@ -34,7 +36,8 @@ export function parseBounty(
     title,
     rubric,
     reward,
-    deadline,
+    submitDeadline,
+    revealDeadline,
     judged,
     finalized,
     submissionCount,
@@ -46,7 +49,8 @@ export function parseBounty(
     title,
     rubric,
     reward,
-    deadline,
+    submitDeadline,
+    revealDeadline,
     judged,
     finalized,
     submissionCount,
@@ -55,26 +59,40 @@ export function parseBounty(
   };
 }
 
-export type BountyStatus = "open" | "ready" | "judged" | "finalized";
+export type BountyStatus = "open" | "reveal" | "ready" | "judged" | "finalized";
 
 export function getBountyStatus(b: Bounty, nowSeconds = Date.now() / 1000): BountyStatus {
   if (b.finalized) return "finalized";
   if (b.judged) return "judged";
-  const deadlinePassed = Number(b.deadline) <= nowSeconds;
-  return deadlinePassed ? "ready" : "open";
+  const submitPassed = Number(b.submitDeadline) <= nowSeconds;
+  const revealPassed = Number(b.revealDeadline) <= nowSeconds;
+  if (revealPassed) return "ready";
+  if (submitPassed) return "reveal";
+  return "open";
 }
 
-export const STATUS_META: Record<
+export const STATUS_META: Record
   BountyStatus,
-  { label: string; tone: "green" | "amber" | "indigo" | "zinc" }
+  { label: string; tone: "green" | "yellow" | "amber" | "indigo" | "zinc" }
 > = {
   open: { label: "Open", tone: "green" },
+  reveal: { label: "Reveal phase", tone: "yellow" },
   ready: { label: "Ready for judging", tone: "amber" },
   judged: { label: "Judged", tone: "indigo" },
   finalized: { label: "Finalized", tone: "zinc" },
 };
 
-/** Can a participant still submit an answer? */
+/** Can a participant still submit a commitment? */
 export function canSubmit(b: Bounty, nowSeconds = Date.now() / 1000): boolean {
-  return !b.judged && !b.finalized && Number(b.deadline) > nowSeconds;
+  return !b.judged && !b.finalized && Number(b.submitDeadline) > nowSeconds;
+}
+
+/** Can a participant reveal their answer? */
+export function canReveal(b: Bounty, nowSeconds = Date.now() / 1000): boolean {
+  return (
+    !b.judged &&
+    !b.finalized &&
+    Number(b.submitDeadline) <= nowSeconds &&
+    Number(b.revealDeadline) > nowSeconds
+  );
 }
