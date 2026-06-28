@@ -151,7 +151,7 @@ export function buildJudgeAllLlmInput({
     [], // secretSignatures
     "0x", // userPublicKey
     messages,
-    "zai-org/GLM-4.7-FP8",
+    JUDGE_MODEL,
     0n, // frequencyPenalty
     "", // logitBiasJson
     false, // logprobs
