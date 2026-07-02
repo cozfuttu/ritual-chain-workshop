@@ -32,7 +32,7 @@ export function FinalizeWinner({
   isOwner: boolean;
   onFinalized: () => void;
 }) {
-  const count = Number(bounty.submissionCount);
+  const count = Number(bounty.revealedCount);
   const recommended = decodeAiReview(bounty.aiReview)?.parsed?.winnerIndex;
 
   // The input is prefilled with the AI recommendation until the owner edits it.

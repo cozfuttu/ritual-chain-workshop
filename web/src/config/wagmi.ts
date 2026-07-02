@@ -1,6 +1,6 @@
 import { createConfig, http } from "wagmi";
 import { defineChain } from "viem";
-import { injected, metaMask, walletConnect } from "wagmi/connectors";
+import { injected, walletConnect } from "wagmi/connectors";
 import { ritualChainId, ritualRpcUrl } from "@/config/contract";
 
 /**

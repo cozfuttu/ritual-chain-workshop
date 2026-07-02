@@ -1,5 +1,13 @@
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
 import { configVariable, defineConfig } from "hardhat/config";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+try {
+  process.loadEnvFile(join(dirname(fileURLToPath(import.meta.url)), ".env"));
+} catch {
+  // .env is optional; CI and shells can still provide config variables directly.
+}
 
 export default defineConfig({
   plugins: [hardhatToolboxViemPlugin],
