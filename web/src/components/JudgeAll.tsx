@@ -35,9 +35,9 @@ export function JudgeAll({
   // contract) — judgeAll spends prepaid+locked RITUAL via the LLM precompile.
   const walletStatus = useRitualWalletStatus(address);
 
-  const count = Number(bounty.submissionCount);
+  const count = Number(bounty.revealedCount);
 
-  // Gate per spec: owner only, has submissions, not yet judged.
+  // Gate per spec: owner only, has revealed submissions, not yet judged.
   if (!isOwner || bounty.judged || bounty.finalized || count === 0) {
     return null;
   }

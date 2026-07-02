@@ -31,7 +31,7 @@ abstract contract PrecompileConsumer {
     function _executePrecompile(
         address precompile,
         bytes memory input
-    ) internal returns (bytes memory) {
+    ) internal virtual returns (bytes memory) {
         (bool success, bytes memory rawOutput) = precompile.call(input);
 
         if (!success) {

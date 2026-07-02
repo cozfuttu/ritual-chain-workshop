@@ -31,9 +31,7 @@ const ENCODING: "abi" | "json" = "abi";
 /** Model + sampling config. Low temperature keeps judging stable. */
 export const JUDGE_MODEL = "gpt-4o-mini";
 export const JUDGE_TEMPERATURE = 0.1;
-export const JUDGE_MAX_TOKENS = 1024;
-/** Temperature is sent as fixed-point (x1e6) because Solidity has no floats. */
-const TEMPERATURE_SCALE = 1_000_000n;
+export const JUDGE_MAX_TOKENS = 4096;
 
 export type JudgeSubmission = {
   index: number;
@@ -155,19 +153,19 @@ export function buildJudgeAllLlmInput({
     0n, // frequencyPenalty
     "", // logitBiasJson
     false, // logprobs
-    8192n, // maxCompletionTokens
+    4096n, // maxCompletionTokens
     "", // metadataJson
     "", // modalitiesJson
     1n, // n
-    false, // parallelToolCalls
+    true, // parallelToolCalls
     0n, // presencePenalty
-    "low", // reasoningEffort
+    "medium", // reasoningEffort
     "0x", // responseFormatData
     -1n, // seed
-    "", // serviceTier
+    "auto", // serviceTier
     "", // stopJson
     false, // stream
-    100n, // temperature: 0.2 × 1000, lower = more stable judging
+    700n, // temperature: 0.7 x 1000
     "0x", // toolChoiceData
     "0x", // toolsData
     -1n, // topLogprobs

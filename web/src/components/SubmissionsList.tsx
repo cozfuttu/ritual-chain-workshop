@@ -24,13 +24,13 @@ export function SubmissionsList({
   return (
     <Card>
       <CardHeader
-        title="Submissions"
-        subtitle="All submissions are judged together after the deadline."
+        title="Revealed submissions"
+        subtitle="Only valid reveals are judged together after the reveal deadline."
         action={<Badge tone="zinc">{count}</Badge>}
       />
       <CardBody className="space-y-3">
         {count === 0 ? (
-          <p className="text-sm text-zinc-500">No submissions yet.</p>
+          <p className="text-sm text-zinc-500">No revealed submissions yet.</p>
         ) : (
           indices.map((i) => (
             <SubmissionRow
