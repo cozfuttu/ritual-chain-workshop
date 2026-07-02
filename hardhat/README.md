@@ -49,8 +49,11 @@ npx hardhat ignition deploy ignition/modules/AIJudge.ts
 Ritual Chain deployment:
 
 ```bash
-DEPLOYER_PRIVATE_KEY=0x... npx hardhat ignition deploy ignition/modules/AIJudge.ts --network ritual
+npx hardhat ignition deploy ignition/modules/AIJudge.ts --network ritual
 ```
+
+Put the deployer key in a local, ignored `hardhat/.env` file before running the
+command.
 
 The Ritual network configuration uses:
 
